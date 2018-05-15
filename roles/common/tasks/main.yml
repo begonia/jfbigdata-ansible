@@ -1,0 +1,99 @@
+- name: Disable selinux
+  selinux:
+    state: disabled
+
+- name: Stop NetworkManager
+  service:
+    name: NetworkManager
+    state: stopped
+     
+- name: Disable NetworkManager
+  service:
+    name: NetworkManager
+    enabled: no
+
+- name: Remove repository (and clean up left-over metadata)
+  yum_repository:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - base
+    - updates
+    - extras
+
+- name: Yum clean metadata
+  command: yum clean metadata
+  args:
+    warn: no
+
+- name: Remove repository file
+  file:
+    path: /etc/yum.repos.d/CentOS-Base.repo
+    state: absent
+
+- name: Add centos base yum repo
+  yum_repository:
+    name: "{{ item.name }}"
+    description: "{{ item.description }}"
+    file: base
+    baseurl: "{{ item.baseurl }}"
+    gpgcheck: no
+  with_items:
+    - {"name": "base", "description": "CentOS-$releasever - Base", "baseurl": "http://{{ yum_repo_url | default('mirrors.ustc.edu.cn') }}/centos/$releasever/os/$basearch/"}
+    - {"name": "updates", "description": "CentOS-$releasever - Updates", "baseurl": "http://{{ yum_repo_url | default('mirrors.ustc.edu.cn') }}/centos/$releasever/updates/$basearch/"}
+    - {"name": "extras", "description": "CentOS-$releasever - Extras", "baseurl": "http://{{ yum_repo_url | default('mirrors.ustc.edu.cn') }}/centos/$releasever/extras/$basearch/"} 
+
+- name: Add epel yum repo
+  yum_repository:
+    name: epel
+    description: Extra Packages for Enterprise Linux 7 - $basearch
+    file: epel
+    baseurl: http://{{ yum_repo_url | default('mirrors.ustc.edu.cn') }}/epel/7/$basearch
+    gpgcheck: no
+
+- name: Add mariadb yum repo
+  yum_repository:
+    name: mariadb 
+    description: Mariadb repo
+    file: mariadb
+    baseurl: http://{{ yum_repo_url | default('mirrors.ustc.edu.cn') }}/mariadb/yum/10.2/centos7-amd64
+    gpgcheck: no
+
+- name: Add percona yum repo
+  yum_repository:
+    name: percona
+    description: percona repo
+    file: percona
+    baseurl: http://{{ yum_repo_url | default('mirrors.ustc.edu.cn') }}/percona/release/$releasever/RPMS/$basearch
+    gpgcheck: no
+
+- name: Add ceph yum repo
+  yum_repository:
+    name: ceph
+    description: Ceph Stable repo
+    file: ceph
+    baseurl: http://{{ yum_repo_url | default('mirrors.ustc.edu.cn') }}/ceph/rpm-luminous/el7/$basearch
+    gpgcheck: no
+
+- name: Add nginx yum repo
+  yum_repository:
+    name: nginx 
+    description: nginx repo
+    file: nginx
+    baseurl: http://{{ yum_repo_url | default('mirrors.ustc.edu.cn') }}/nginx/centos/7/$basearch
+    gpgcheck: no
+
+- name: Install base packages
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items:
+  - net-tools
+  - telnet
+  - wget
+  - sysstat
+  - vim
+  - unzip
+  - perl
+  - rsync
+  - ntpdate
