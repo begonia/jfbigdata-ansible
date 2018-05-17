@@ -1,0 +1,37 @@
+- name: Install qemu-kvm Packages
+  yum: 
+    name: "{{ item }}"
+    state: present
+  with_items:
+  - qemu-kvm
+  - libvirt
+  - virt-install
+
+- name: Start the libvirt service
+  service:
+    name: libvirtd
+    state: started
+
+- name: enable the libvirt service
+  service:
+    name: libvirtd
+    enabled: yes
+
+- name: Undefine libvirt default net
+  shell: virsh net-undefine default || /usr/bin/true
+
+- name: Destroy libvirt default net
+  shell: virsh net-destroy default || /usr/bin/true
+
+- name: Restart the libvirtd service
+  service:
+    name: libvirtd
+    state: restarted
+
+- name: Firewalld accept vnc port
+  firewalld:
+    service: vnc-server
+    permanent: true
+    state: enabled
+    immediate: true
+
