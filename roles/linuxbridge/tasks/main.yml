@@ -1,0 +1,20 @@
+- name: Install bridge utils
+  yum:
+    name: bridge-utils
+    state: present
+
+- name: Create bridge config file
+  template:
+    src: bridge.j2
+    dest: /etc/sysconfig/network-scripts/ifcfg-br-{{ nic }}
+
+- name: Modify nic config file
+  template:
+    src: nic.j2
+    dest: /etc/sysconfig/network-scripts/ifcfg-{{ nic }}
+
+- name: Restart network
+  service:
+    name: network
+    state: restarted
+

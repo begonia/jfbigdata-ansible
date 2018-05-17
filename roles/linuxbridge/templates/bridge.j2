@@ -1,0 +1,8 @@
+BOOTPROTO=static
+DEVICE=br-{{ nic }}
+TYPE=Bridge
+NM_CONTROLLED=no
+IPADDR={{ ansible_em1.ipv4.address }}
+NETMASK={{ netmask }}
+GATEWAY={{ gateway }}
+DNS1={{ dns }}
