@@ -1,0 +1,9 @@
+- name: Copy Oracle JDK
+  copy:
+    src: jdk-8u171-linux-x64.rpm
+    dest: /usr/local/src/
+
+- name: Install Oracle JDK 
+  yum:
+    name: "/usr/local/src/jdk-8u171-linux-x64.rpm"
+    state: "present"
