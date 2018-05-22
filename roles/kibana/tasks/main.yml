@@ -1,0 +1,30 @@
+- name: Copy kibana rpm file
+  copy:
+    src: kibana-6.2.4-x86_64.rpm
+    dest: /tmp/kibana.rpm
+
+- name: Yum install kibana
+  yum:
+    name: /tmp/kibana.rpm
+    state: present
+
+- name: Configure kibana
+  template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    owner: kibana
+    group: kibana
+    backup: yes
+  notify: restart kibana
+
+- name: Enable kibana Service
+  systemd:
+    name: kibana
+    enabled: yes
+
+- name: Accept kibana firewalld
+  firewalld:
+    service: kibana
+    permanent: true
+    state: enabled
+    immediate: yes
