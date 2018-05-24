@@ -1,0 +1,14 @@
+- name: Yum install ntpdate
+  yum:
+    name: ntpdate
+    state: present
+    disable_gpg_check: yes
+
+- name: "Sync date to {{ ntpserver | default('ntp.sjtu.edu.cn') }}"
+  command: "ntpdate {{ ntpserver | default('ntp.sjtu.edu.cn') }}"
+
+- name: "Add utpdate crontab job"
+  cron:
+    name: "sync date to {{ ntpserver | default('ntp.sjtu.edu.cn') }} after reboot"
+    special_time: reboot
+    job: "ntpdate {{ ntpserver | default('ntp.sjtu.edu.cn') }}"
