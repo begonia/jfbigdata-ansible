@@ -1,0 +1,47 @@
+- name: Yum install ntp
+  yum:
+    name: ntp
+    state: present
+
+- name: Configure ntp.conf (1/3)
+  lineinfile:
+    path: /etc/ntp.conf
+    line: "restrict {{ ntp_subnet | default('192.168.1.0') }} mask {{ ntp_netmask | default('255.255.255.0') }} nomodify notrap"
+    insertafter: 'restrict ::1'
+
+- name: Configure ntp.conf (2/3)
+  lineinfile:
+    path: /etc/ntp.conf
+    regexp: '^server'
+    state: absent
+
+- name: Configure ntp.conf (3/3)
+  lineinfile:
+    path: /etc/ntp.conf
+    line: "server {{ ntp_upstream | default('127.127.1.0') }}"
+    insertbefore: "^#broadcast"
+
+- name: Check if firewalld is running
+  shell: systemctl is-active firewalld
+  ignore_errors: yes
+  register: firewalld_status
+
+- name: Accept ntpd firewall port 123/udp
+  firewalld:
+    service: ntp
+    permanent: true
+    state: enabled
+    immediate: yes
+  when: firewalld_status.stdout == "active"
+
+- name: Restart ntpd
+  service:
+    name: ntpd
+    state: restarted
+
+- name: Ensure ntpd is started and enabled to start at boot
+  service:
+    name: ntpd
+    state: started
+    enabled: yes
+
