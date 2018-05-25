@@ -1,0 +1,10 @@
+- name: Ensure dns servers are configured in /etc/resolv.conf
+  template: src=resolv.conf.j2 dest=/etc/resolv.conf
+
+- name: Remove dns config in ifcfg
+  lineinfile:
+    path: "/etc/sysconfig/network-scripts/ifcfg-{{ item }}"
+    regexp: "^DNS"
+    state: absent
+  with_items: 
+    - "{{ interface_name }}"

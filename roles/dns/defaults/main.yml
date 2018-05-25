@@ -1,0 +1,2 @@
+dns_nameservers: ['114.114.114.114', '114.114.115.115']
+interface_name: ['eth0']
