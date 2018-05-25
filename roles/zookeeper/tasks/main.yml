@@ -1,0 +1,22 @@
+- name: Create zookeeper group
+  group: name={{zookeeper.group}} system=yes
+
+- name: Create zookeeper user
+  user: name={{zookeeper.user}} group={{zookeeper.group}} system=yes create_home=no
+
+- name: Install Zookeeper
+  include: build.yml
+
+- name: "Accept Zookeeper Firewalld Ports"
+  firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: yes
+  with_items:
+    - "{{ zookeeper.client_port }}"
+    - "{{ zookeeper.connect_port }}"
+    - "{{ zookeeper.election_port }}"
+
+- name: Configure Zookeeper
+  include: configure.yml

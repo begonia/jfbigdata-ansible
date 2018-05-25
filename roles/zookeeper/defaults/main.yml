@@ -1,0 +1,25 @@
+---
+
+JAVA_HOME: "/usr/java/default"
+zookeeper_heap_size: 3072m
+
+zookeeper:
+  client_port: 2181
+  connect_port: 2888
+  conf_dir: /etc/zookeeper
+  data_dir: /var/lib/zookeeper
+  election_port: 3888
+  group: zookeeper
+  user: zookeeper
+  hosts:
+    - 192.168.1.212
+    - 192.168.1.222
+    - 192.168.1.232
+  # java_opts: "-Xmx{{ (ansible_memtotal_mb / 2) | int }}m -Xms{{ (ansible_memtotal_mb / 2) | int }}m"
+  java_opts: "-Xmx{{zookeeper_heap_size}} -Xms{{zookeeper_heap_size}}"
+  # note this is for application logs, not the actual zookeeper data logs
+  log_dir: /var/log/zookeeper
+  log_level: WARN
+  version: 3.4.12
+
+
