@@ -1,0 +1,46 @@
+- name: Yum install dnsmasq
+  yum:
+    name: dnsmasq
+    state: present
+
+- name: Configure dnsmasq.conf
+  lineinfile:
+    path: /etc/dnsmasq.conf
+    line: "strict-order"
+    insertafter: "# /etc/resolv.conf"
+
+- name: Configure DNS upstream
+  template:
+    src: "resolve.conf.j2"
+    dest: "/etc/resolv.conf"
+    force: yes
+
+- name: Copy DNS record
+  template:
+    src: "record.conf.j2"
+    dest: "/etc/dnsmasq.d/record.conf"
+    force: yes
+
+- name: Check if firewalld is running
+  shell: systemctl is-active firewalld
+  ignore_errors: yes
+  register: firewalld_status
+
+- name: Accept dns firewall port 53/udp and 53/tcp
+  firewalld:
+    service: dns
+    permanent: true
+    state: enabled
+    immediate: yes
+  when: firewalld_status.stdout == "active"
+
+- name: Restart dnsmasq
+  service:
+    name: dnsmasq
+    state: restarted
+
+- name: Enable dnsmasq
+  service:
+    name: dnsmasq
+    enabled: yes
+

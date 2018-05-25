@@ -1,0 +1,4 @@
+nameserver 127.0.0.1
+nameserver {{ dns_upstream1 | default("114.114.114.114") }}
+nameserver {{ dns_upstream2 | default("114.114.115.115") }}
+search localdomain
