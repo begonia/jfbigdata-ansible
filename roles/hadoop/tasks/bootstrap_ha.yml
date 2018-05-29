@@ -1,0 +1,70 @@
+---
+- name: Pause - Bootstrapping is about to begin
+  pause: prompt="Are you sure that you want to continue bootstrapping HDFS?" seconds=10
+
+- name: Ensure that zookeeper is running
+  service: name=zookeeper state=started
+  when: inventory_hostname in hdfs_zookeeper_hosts
+
+- name: Ensure that journal nodes are running
+  service: name=hdfs-journalnode state=started
+  when: inventory_hostname in hdfs_journalnodes
+
+- name: Format namenode {{hdfs_namenodes[0]}}
+  command: bash -lc "./hdfs namenode -format {{ hdfs_cluster_name }} -force"
+  args:
+    creates: "{{hdfs_namenode_dir_list[0]}}/current/VERSION"
+    chdir: "{{ hdfs_bin_dir }}"
+  become: true
+  become_user: "{{hdfs_user}}"
+  when: inventory_hostname == hdfs_namenodes[0]
+
+- name: Start namenode {{hdfs_namenodes[0]}}
+  service: name=hdfs-namenode state=started
+  when: inventory_hostname == hdfs_namenodes[0]
+
+- name: Wait for the namenode {{ hdfs_namenodes[0] }} to come online
+  wait_for: host={{ hdfs_namenodes[0] }} port=50070
+  when: inventory_hostname in hdfs_namenodes
+
+- name: Bootstrap the standby namenode ({{hdfs_namenodes[1]}})
+  command: bash -lc "./hdfs namenode -bootstrapStandby && touch {{hdfs_namenode_dir_list[0]}}/.bootstrapped"
+  args:
+    creates: "{{hdfs_namenode_dir_list[0]}}/.bootstrapped"
+    chdir: "{{ hdfs_bin_dir }}"
+  become: true
+  become_user: "{{hdfs_user}}"
+  when: inventory_hostname == hdfs_namenodes[1]
+
+- name: Start namenode {{hdfs_namenodes[1]}}
+  service: name=hdfs-namenode state=started
+  when: inventory_hostname == hdfs_namenodes[1]
+
+- name: Format ZK for zkfc
+  command: bash -lc "./hdfs zkfc -formatZK -force && touch {{hdfs_namenode_dir_list[0]}}/.zkFormatted"
+  args:
+    creates: "{{hdfs_namenode_dir_list[0]}}/.zkFormatted"
+    chdir: "{{ hdfs_bin_dir }}"
+  become: true
+  become_user: "{{hdfs_user}}"
+  when: inventory_hostname == hdfs_namenodes[0]
+
+- name: Start zkfc services
+  service: name=hdfs-zkfc state=started
+  when: inventory_hostname in hdfs_namenodes
+
+- name: Start data nodes
+  service: name=hdfs-datanode state=started
+  when: inventory_hostname in hdfs_datanodes
+
+- name: Start YARN resourcemanger nodes
+  service: name=yarn-resourcemanager state=started
+  when: inventory_hostname in yarn_rmnodes and yarn_enabled
+
+- name: Start YARN nodemanager nodes
+  service: name=yarn-nodemanager state=started
+  when: inventory_hostname in yarn_nmnodes and yarn_enabled
+
+- name: Bootstrapping complete
+  debug: "msg='New namenode can be opened at http://{{ inventory_hostname }}:50070/'"
+  when: inventory_hostname in hdfs_namenodes

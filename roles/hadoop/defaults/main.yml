@@ -1,0 +1,168 @@
+---
+# ------------------------------------------------------------------------------
+# General cluster settings
+# ------------------------------------------------------------------------------
+hdfs_cluster_name: jfhadoop
+hdfs_user: hadoop
+hdfs_group: hadoop
+hdfs_user_home: "/home/{{ hdfs_user }}"
+hdfs_version: 2.9.1
+hdfs_upgrade: False
+hdfs_upgrade_force: False
+
+hdfs_java_home: /usr/java/latest
+
+# Bootstraps the cluster ( Format namenodes, zkfc, journalnodes, start all services)
+# Please read the code before you activate this option.
+# Especially if you already have a hadoop setup in place.
+hdfs_bootstrap: True
+
+# Use ansible handlers?
+hdfs_ansible_handlers: False
+# Redistribute ssh keys every time?
+hdfs_redistribute_ssh_keys: False
+
+hdfs_parent_dir: /usr/local  # hadoop binaries will be copied here
+hdfs_ssh_known_hosts_file: "{{ hdfs_user_home }}/.ssh/known_hosts"
+
+# ------------------------------------------------------------------------------
+# Hadoop installation source
+# ------------------------------------------------------------------------------
+hdfs_distribution_method: "local_file"   # Method to use for archive installation ("download", "local_file" or "compile")
+hdfs_download_url: "https://archive.apache.org/dist/hadoop/core/hadoop-{{ hdfs_version }}/hadoop-{{ hdfs_version }}.tar.gz"
+hdfs_local_archive_path: "./"
+
+# ------------------------------------------------------------------------------
+# Hadoop host variables
+# ------------------------------------------------------------------------------
+hdfs_namenodes: "{{ groups.namenodes }}"
+hdfs_hadoop_hosts: "{{ groups.hadoop_hosts }}"
+hdfs_journalnodes: "{{ groups.journalnodes }}"
+hdfs_secondary_namenode: "{{ groups.secondarynamenode if groups.secondarynamenode is defined else [] }}"
+hdfs_datanodes: "{{ groups.datanodes }}"
+hdfs_zookeeper_hosts: "{{ groups.zookeeper }}"
+
+# ------------------------------------------------------------------------------
+# Hadoop native libraries (experimental)
+# ------------------------------------------------------------------------------
+hdfs_compile_from_source: "{{ hdfs_distribution_method == 'compile' }}"
+hdfs_compile_node: "{{ hdfs_namenodes[0] }}"
+hdfs_compile_from_git: True
+hdfs_compile_version: "tags/rel/release-{{hdfs_version}}"
+hdfs_fetch_folder: /tmp/ansible_fetch
+
+# ------------------------------------------------------------------------------
+# HA specific setup
+# ------------------------------------------------------------------------------
+# Use ssh as fencing method (other option is shell(/bin/true)
+hdfs_ssh_fence: false
+
+hdfs_ha_enabled: "{{hdfs_namenodes | count > 1}}"
+hdfs_default_fs: "hdfs://{{ hdfs_nameservices if hdfs_ha_enabled else hdfs_namenodes[0] + ':8020' }}"
+hdfs_nameservices: "{{ hdfs_cluster_name }}"
+hdfs_zookeeper_client_port: 2181
+hdfs_zookeeper_quorum: "{{ hdfs_zookeeper_hosts | join(':' + (hdfs_zookeeper_client_port | string) + ',')  }}:{{ hdfs_zookeeper_client_port | string }}"
+
+
+# ------------------------------------------------------------------------------
+# Non-HA specific setup
+# ------------------------------------------------------------------------------
+hdfs_secondary_namenode_http_address: "0.0.0.0:50090"
+
+# ------------------------------------------------------------------------------
+# Hadoop configuration
+# ------------------------------------------------------------------------------
+
+# Symlink for hadoop to the version you are installing
+hdfs_hadoop_home: "{{hdfs_parent_dir}}/hadoop"
+hdfs_conf_dir: "{{hdfs_hadoop_home}}/etc/hadoop"
+hdfs_bin_dir: "{{hdfs_hadoop_home}}/bin"
+hdfs_log_dir: /var/log/hadoop
+hdfs_tmpdir: "{{hdfs_hadoop_home}}/tmp"
+
+# Directories where namenode should store metadata
+hdfs_namenode_dir_list:
+ - "{{hdfs_hadoop_home}}/namenode"
+# Directories where secondary namenode should store temporary images to merge
+hdfs_namenode_checkpoint_dir_list:
+ - "{{hdfs_hadoop_home}}/secondarynamenode"
+# Directories where datanodes should store data
+hdfs_datanode_dir_list:
+ - "{{hdfs_hadoop_home}}/datanode"
+
+# Directories where journal nodes should store edits
+hdfs_dfs_journalnode_edits_dir: "{{hdfs_hadoop_home}}/journaldir"
+hdfs_dfs_journalnode_edits_dir_perm: "700"
+
+hdfs_enable_short_circuit_reads: true  # IMPORTANT: this property should be 'true' or 'false'
+
+# ------------------------------------------------------------------------------
+# Extended core-site.xml
+# ------------------------------------------------------------------------------
+hdfs_tmpdir_user: "{{hdfs_tmpdir}}/hadoop-${user.name}"
+hdfs_fs_trash_interval: 0
+hdfs_fs_trash_checkpoint_interval: 0  # If 0 this is set to the value of hdfs_fs_trash_interval by hadoop
+
+# ------------------------------------------------------------------------------
+# Extended hdfs-site.xml
+# ------------------------------------------------------------------------------
+
+hdfs_fs_permissions_umask_mode: "002"
+hdfs_dfs_permissions_superusergroup: "{{hdfs_group}}"
+hdfs_dfs_blocksize: 134217728
+hdfs_dfs_namenode_write_stale_datanode_ratio: "0.5f"
+hdfs_dfs_datanode_du_reserved: "1073741824"
+hdfs_dfs_datanode_data_dir_perm: "700"
+hdfs_dfs_datanode_max_transfer_threads: 4096
+hdfs_dfs_replication: 2
+hdfs_dfs_replication_max: 50
+hdfs_dfs_namenode_replication_min: 1
+hdfs_dfs_namenode_checkpoint_period: 3600
+# the recommended 'namenode handler count' is best defined by formula: lb(#datanodes) * 20
+# and recommended 'service handler count'  50% of the previous value
+# Ref: https://community.hortonworks.com/articles/43839/scaling-the-hdfs-namenode-part-2.html
+# -> for an average cluster 10-20 DNs the value 64 is a good average (for 32+ DNs -> 100+)
+hdfs_dfs_namenode_handler_count: 32
+hdfs_dfs_namenode_service_handler_count: "{{ (hdfs_dfs_namenode_handler_count / 2)|int}}"
+hdfs_dfs_namenode_avoid_read_stale_datanode: true
+hdfs_dfs_namenode_avoid_write_stale_datanode: true
+hdfs_dfs_namenode_audit_log_async: false
+hdfs_dfs_client_file_block_storage_locations_num_threads: 10
+hdfs_dfs_client_file_block_storage_locations_timeout_millis: 1000
+hdfs_dfs_domain_socket_path_folder: /var/lib/hadoop-hdfs
+
+# ------------------------------------------------------------------------------
+# log4j.properties vars
+# ------------------------------------------------------------------------------
+
+hadoop_log_maxfilesize: "256MB"
+hadoop_log_maxbackupindex: 20
+
+# ------------------------------------------------------------------------------
+# hadoop-env.sh vars
+# ------------------------------------------------------------------------------
+hdfs_namenode_heap_size: "2048m"
+hdfs_namenode_javaOpts: "-Xmx{{hdfs_namenode_heap_size}}"
+hdfs_datanode_javaOpts: ""
+
+# default logger selection used in hadoop-env.sh
+hadoop_security_logger: "INFO,RFAS"
+hadoop_audit_logger: "INFO,NullAppender"
+
+# ------------------------------------------------------------------------------
+# Rack specific
+# ------------------------------------------------------------------------------
+
+# rack awareness script: see https://bigdataprocessing.wordpress.com/2013/07/30/hadoop-rack-awareness-and-configuration/)
+# and templates/rack-awareness.sh.j2
+# if this is not defined, the hdfs will not be rack aware. DO NOT USE SINGLE QUOTES (or make sure it works)
+# hdfs_rack_script_awk: '"{if ($4 < 3) print "rack-1"; else print "rack-2" }"'
+hdfs_rack_script_path: "{{hdfs_conf_dir}}/rack-awareness.sh"
+
+
+# -----------------------------------------------------------------------------
+# YARN
+# -----------------------------------------------------------------------------
+yarn_enabled: true
+yarn_rmnodes: "{{ groups.yarnrmnodes | default(hdfs_namenodes)}}"
+yarn_nmnodes: "{{ groups.yarnnmnodes | default(hdfs_datanodes) }}"

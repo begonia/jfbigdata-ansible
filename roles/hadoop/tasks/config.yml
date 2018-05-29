@@ -1,0 +1,88 @@
+---
+- name: Configure hadoop-env.sh
+  template: src=hadoop-env.sh.j2 dest={{hdfs_conf_dir}}/hadoop-env.sh owner={{hdfs_user}} group={{hdfs_group}} mode=0755
+  notify:
+   - Restart namenode
+   - Restart secondary namenode
+   - Restart datanode
+   - Restart journalnode
+   - Restart zkfc
+  tags:
+   - hdfs-env
+   - hdfs-log4j-config
+
+- name: Configure core-site.xml
+  template: src=core-site.xml.j2 dest={{hdfs_conf_dir}}/core-site.xml owner={{hdfs_user}} group={{hdfs_group}} mode=0755
+  notify:
+   - Restart namenode
+   - Restart secondary namenode
+   - Restart datanode
+   - Restart journalnode
+   - Restart zkfc
+  tags:
+   - hdfs-core-config
+
+- name: Configure hdfs-site.xml
+  template: src=hdfs-site.xml.j2 dest={{hdfs_conf_dir}}/hdfs-site.xml owner={{hdfs_user}} group={{hdfs_group}} mode=0755
+  notify:
+   - Restart namenode
+   - Restart secondary namenode
+   - Restart datanode
+   - Restart journalnode
+   - Restart zkfc
+  tags:
+   - hdfs-site-config
+
+- name: Configure log4j.properties
+  template: src=log4j.properties.j2 dest={{hdfs_conf_dir}}/log4j.properties owner={{hdfs_user}} group={{hdfs_group}} mode=0755
+  notify:
+   - Restart namenode
+   - Restart secondary namenode
+   - Restart datanode
+   - Restart journalnode
+   - Restart zkfc
+  tags:
+   - hdfs-log4j-config
+
+- name: Configure yarn-env.xml
+  template: src=yarn-env.sh.j2 dest={{hdfs_conf_dir}}/yarn-env.sh owner={{hdfs_user}} group={{hdfs_group}} mode=0755
+  when: yarn_enabled
+
+- name: Configure yarn-site.xml
+  template: src=yarn-site.xml.j2 dest={{hdfs_conf_dir}}/yarn-site.xml owner={{hdfs_user}} group={{hdfs_group}} mode=0755
+  when: yarn_enabled
+
+# ports list ref:
+# https://docs.hortonworks.com/HDPDocuments/HDP2/HDP-2.4.0/bk_HDP_Reference_Guide/content/reference_chap2.html
+
+#- name: Configure Firewalld rules
+#  firewalld:
+#    port: "{{ item }}/tcp"
+#    permanent: true
+#    state: enabled
+#    immediate: yes
+#  with_items:
+#    - 50070
+#    - 8020
+#    - 50075
+#    - 50010
+#    - 50020
+#    - 50090
+#    - 10020
+#    - 19888
+#    - 13562
+#    - 8088
+#    - 8050
+#    - 8025
+#    - 8030
+#    - 8141
+#    - 45454
+#    - 10200
+#    - 8188
+
+- name: Disable Firewalld
+  systemd:
+    name: firewalld
+    state: stopped
+    masked: yes
+    

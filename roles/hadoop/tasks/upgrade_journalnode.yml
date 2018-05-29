@@ -1,0 +1,7 @@
+---
+- block:
+  - name: Restart journalnode
+    service: name=hdfs-journalnode state=restarted
+  when:
+    - inventory_hostname == hdfs_journalnode
+  tags: upgrade_journalnode

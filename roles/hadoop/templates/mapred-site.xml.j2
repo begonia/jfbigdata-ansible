@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+  {% if yarn_enabled -%}
+  <property>  
+    <name>mapreduce.framework.name</name>  
+    <value>yarn</value>  
+  </property>  
+  
+<!-- 配置 MapReduce JobHistory Server 地址 ，默认端口10020 -->  
+  <property>  
+    <name>mapreduce.jobhistory.address</name>  
+    <value>0.0.0.0:10020</value>  
+  </property>  
+  
+<!-- 配置 MapReduce JobHistory Server web ui 地址， 默认端口19888 -->  
+  <property>  
+    <name>mapreduce.jobhistory.webapp.address</name>  
+    <value>0.0.0.0:19888</value>  
+  </property>  
+  {% else -%}
+  <property>
+    <name>mapred.job.tracker</name>
+    <value>{{ hdfs_namenodes[0] }}:8021</value>
+  </property>
+  {% endif -%}
+  <property>
+    <name>mapred.hosts.exclude</name>
+    <value>{{ hdfs_conf_dir }}/dfs.hosts.exclude</value>
+  </property>
+</configuration>

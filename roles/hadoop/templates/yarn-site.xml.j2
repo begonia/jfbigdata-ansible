@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+<!--日志聚合功能-->   
+  <property>  
+     <name>yarn.log-aggregation-enable</name>  
+     <value>true</value>  
+  </property>  
+  
+<!--在HDFS上聚合的日志最长保留多少秒。3天-->   
+  <property>  
+     <name>yarn.log-aggregation.retain-seconds</name>  
+     <value>259200</value>  
+  </property>  
+  
+<!--RM失联后重新链接的时间-->   
+  <property>   
+     <name>yarn.resourcemanager.connect.retry-interval.ms</name>   
+     <value>2000</value>   
+  </property>  
+  
+<!--开启resource manager HA,默认为false-->   
+  <property>   
+     <name>yarn.resourcemanager.ha.enabled</name>   
+     <value>true</value>   
+  </property>   
+  
+<!--配置resource manager -->  
+  <property>  
+    <name>yarn.resourcemanager.ha.rm-ids</name>  
+    <value>{{ yarn_rmnodes | join(',') }}</value>  
+  </property>  
+  
+  <property>  
+    <name>ha.zookeeper.quorum</name>  
+    <value>{{ hdfs_zookeeper_quorum }}</value>   
+  </property>  
+    
+<!--开启故障自动切换-->   
+  <property>   
+     <name>yarn.resourcemanager.ha.automatic-failover.enabled</name>   
+     <value>true</value>   
+  </property>   
+  {% for host in yarn_rmnodes -%} 
+  <property>  
+    <name>yarn.resourcemanager.hostname.{{ host }}</name>  
+    <value>{{ host }}</value>  
+  </property>  
+  {% endfor -%}                     
+  
+<!--在namenode1上配置rm1,在namenode2上配置rm2,注意：一般都喜欢把配置好的文件远程复制到其它机器上，但这个在YARN的另一个机器上一定要修改-->   
+  {% if inventory_hostname in yarn_rmnodes -%}
+  <property>   
+    <name>yarn.resourcemanager.ha.id</name>   
+    <value>{{ inventory_hostname }}</value>   
+  <description>If we want to launch more than one RM in single node, we need this configuration</description>   
+  </property>   
+  {% endif -%}
+  
+<!--开启自动恢复功能-->   
+  <property>  
+    <name>yarn.resourcemanager.recovery.enabled</name>   
+    <value>true</value>   
+  </property>  
+  
+<!--配置与zookeeper的连接地址-->   
+  <property>   
+    <name>yarn.resourcemanager.zk-state-store.address</name>   
+    <value>{{ hdfs_zookeeper_quorum }}</value>  
+  </property>   
+  
+  <property>   
+    <name>yarn.resourcemanager.store.class</name>   
+    <value>org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore</value>   
+  </property>   
+  
+  <property>  
+    <name>yarn.resourcemanager.zk-address</name>  
+    <value>{{ hdfs_zookeeper_quorum }}</value>  
+  </property>  
+  
+  <property>   
+    <name>yarn.resourcemanager.cluster-id</name>   
+    <value>{{ hdfs_cluster_name }}-yarn</value>   
+  </property>   
+  
+<!--schelduler失联等待连接时间-->   
+  <property>   
+    <name>yarn.app.mapreduce.am.scheduler.connection.wait.interval-ms</name>   
+    <value>5000</value>   
+  </property>   
+  
+<!--配置rm -->   
+  {% for host in yarn_rmnodes -%}
+  <property>   
+    <name>yarn.resourcemanager.address.{{ host }}</name>   
+    <value>{{ host }}:8050</value>   
+  </property>   
+  
+  <property>   
+    <name>yarn.resourcemanager.scheduler.address.{{ host }}</name>   
+    <value>{{ host }}:8030</value>   
+  </property>   
+  
+  <property>   
+    <name>yarn.resourcemanager.webapp.address.{{ host }}</name>   
+    <value>{{ host }}:8088</value>   
+  </property>   
+  
+  <property>  
+    <name>yarn.resourcemanager.resource-tracker.address.{{ host }}</name>   
+    <value>{{ host }}:8025</value>   
+  </property>   
+  
+  <property>   
+    <name>yarn.resourcemanager.admin.address.{{ host }}</name>   
+    <value>{{ host }}:8141</value>   
+  </property>   
+  
+  <property>   
+    <name>yarn.resourcemanager.ha.admin.address.{{ host }}</name>   
+    <value>{{ host }}:23142</value>   
+  </property>   
+  {% endfor -%} 
+  
+  <property>   
+    <name>yarn.nodemanager.aux-services</name>   
+    <value>mapreduce_shuffle</value>   
+  </property>   
+  
+  <property>   
+    <name>yarn.nodemanager.aux-services.mapreduce.shuffle.class</name>   
+    <value>org.apache.hadoop.mapred.ShuffleHandler</value>   
+  </property>   
+  
+  <property>   
+    <name>mapreduce.shuffle.port</name>   
+    <value>13562</value>   
+  </property>   
+  
+<!--故障处理类-->  
+  <property>   
+    <name>yarn.client.failover-proxy-provider</name>   
+    <value>org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider</value>   
+  </property>   
+  
+  <property>  
+      <name>yarn.resourcemanager.ha.automatic-failover.zk-base-path</name>  
+      <value>/yarn-leader-election</value>  
+      <description>Optional setting. The default value is /yarn-leader-election</description>  
+  </property>  
+</configuration>
+ 
