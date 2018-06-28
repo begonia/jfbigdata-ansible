@@ -1,0 +1,81 @@
+- name: Install zabbix-agent packages
+  yum:
+    name: http://repo.zabbix.com/zabbix/3.4/rhel/7/x86_64/zabbix-agent-3.4.7-1.el7.x86_64.rpm
+    state: present
+
+- name: Install sysstat
+  yum:
+    name: sysstat
+    state: present
+
+- name: Check if frewalld running
+  shell: systemctl is-active firewalld
+  ignore_errors: yes
+  register: firewalld_status
+
+- debug:
+  msg: "{{inventory_hostname}} firewall is {{firewalld_status.stdout}}"
+
+- name: Accept zabbix_agentd firewall port 10050
+  firewalld:
+    port: 10050/tcp
+    permanent: true
+    state: enabled
+    immediate: yes
+  when: firewalld_status.stdout == "active"
+
+- name: Copy zabbix_agent.conf
+  template:
+    src: zabbix_agentd.conf.yml
+    dest: /etc/zabbix/zabbix_agentd.conf
+  notify: restart zabbix_agentd
+
+- name: Create zabbix agent script directories
+  file:
+    path: /etc/zabbix/scripts
+    state: directory
+    mode: 0755
+
+- name: Copy zabbix agent scripts
+  copy:
+    src: "{{ item }}"
+    dest: /etc/zabbix/scripts/
+    mode: 0755
+  with_items:
+    - disk_discovery.py
+    - disk_status.sh
+    - sysinfo.py
+
+- name: Copy zabbix agent.d conf
+  copy:
+    src: "{{ item }}"
+    dest: /etc/zabbix/zabbix_agentd.d/
+    mode: 0755
+  with_items:
+    - userparameter_system.conf
+    - userparameter_disk.conf
+
+- name: Start sysstat
+  shell: nohup /usr/bin/iostat -dxkt 10  > /tmp/iostat_output 2>/dev/null &
+  
+- name: Add sysstat rc.local
+  lineinfile:
+    path: /etc/rc.local
+    line: nohup /usr/bin/iostat -dxkt 10  > /tmp/iostat_output 2>/dev/null &
+
+- name: Ensure rc.local executable
+  file:
+    path: /etc/rc.local
+    mode: a+x
+
+- name: Copy zabbix_agentd init.d file
+  copy:
+    src: zabbix_agentd
+    dest: /etc/init.d/
+    mode: 0755
+
+- name: Enable zabbix_agentd 
+  service:
+    name: zabbix_agentd
+    enabled: yes
+
