@@ -1,0 +1,56 @@
+user nginx;
+
+error_log  /var/log/nginx/error.log warn;
+pid        /var/run/nginx.pid;
+
+{% block worker %}
+worker_processes  {{ ansible_processor_vcpus | default(ansible_processor_count) }};
+{% endblock %}
+
+{% block events %}
+events {
+    worker_connections  {{ nginx_worker_connections | default("1024") }};
+    multi_accept {{ nginx_multi_accept | default("off") }};
+
+}
+{% endblock %}
+
+http {
+    {% block http_begin %}{% endblock %}
+
+{% block http_basic %}
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    server_names_hash_bucket_size {{ nginx_server_names_hash_bucket_size | default("64") }};
+
+    client_max_body_size {{ nginx_client_max_body_size | default("64m") }};
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log main buffer=16k flush=2m;
+
+    sendfile        {{ nginx_sendfile | default("on") }};
+    tcp_nopush      {{ nginx_tcp_nopush | default("on") }};
+    tcp_nodelay     {{ nginx_tcp_nodelay | default("on") }};
+
+    keepalive_timeout  {{ nginx_keepalive_timeout | default("65") }};
+    keepalive_requests {{ nginx_keepalive_requests | default("100") }};
+
+    server_tokens {{ nginx_server_tokens | default("off") }};
+{% endblock %}
+
+{% block http_gzip %}
+    # gzip on;
+{% endblock %}
+
+
+{% block http_includes %}
+    include /etc/nginx/conf.d/*.conf;
+{% endblock %}
+
+    {% block http_end %}{% endblock %}
+
+}

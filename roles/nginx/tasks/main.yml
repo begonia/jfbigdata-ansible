@@ -1,0 +1,58 @@
+- name: Yum install nginx
+  yum:
+    name: nginx
+    state: present
+
+- name: Create nginx systemd service conf dir
+  file:
+    path: "/etc/systemd/system/nginx.service.d"
+    state: "directory"
+    group: "root"
+    owner: "root"
+    mode: "0755"
+
+- name: Apply nginx systemd options
+  template:
+    src: "systemd.limits.conf.j2"
+    dest: "/etc/systemd/system/nginx.service.d/limits.conf"
+    mode: "0644"
+  notify:
+    - Reload the systemd daemon
+    - Restart nginx
+
+- name: Check if firewalld is running
+  shell: systemctl is-active firewalld
+  ignore_errors: yes
+  register: firewalld_status
+
+- name: Accept nginx default port 80/tcp
+  firewalld:
+    service: http
+    permanent: true
+    state: enabled
+    immediate: yes
+  when: firewalld_status.stdout == "active"
+
+- name: Copy vhosts configuration in place
+  template:
+    src: vhosts.j2
+    dest: /etc/nginx/conf.d/vhosts.conf
+  notify:
+    - Reload nginx
+    
+- name: Copy nginx configuration in place
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - Reload nginx
+
+- name: Ensure nginx is started and enabled to start at boot
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
