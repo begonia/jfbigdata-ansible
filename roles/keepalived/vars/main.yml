@@ -1,0 +1,4 @@
+route_id: "jfbrother"
+keepalived_interface: "eth0"
+virtual_route_id: "10"
+priority: "{{ (groups['all']|length - groups['all'].index(inventory_hostname)) * 250 // (groups['all']|length) }}"

@@ -1,0 +1,30 @@
+global_defs {
+    router_id {{ route_id }}
+}
+
+vrrp_script nginx_check_script {
+    script "/opt/chk_nginx.sh"
+    interval 2
+    fall 2
+    rise 4
+    timeout 2
+}
+
+vrrp_instance internal {
+    interface {{ keepalived_interface }}
+    state BACKUP
+    virtual_router_id {{ virtual_route_id }}
+    priority {{ priority }}
+    nopreempt
+    authentication {
+        auth_type PASS
+        auth_pass 1111
+    }
+    virtual_ipaddress {
+        {{ keepalived_vip }} dev {{ keepalived_interface }}
+    }
+    track_script {
+        nginx_check_script
+    }
+}
+
