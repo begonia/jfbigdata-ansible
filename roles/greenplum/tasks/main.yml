@@ -1,0 +1,264 @@
+- name: Yum install requirement
+  yum:
+    name: "{{ item }}"
+    state: installed
+  with_items:
+    - unzip
+    - net-tools
+    - perl
+    - rsync
+
+- name: "Change hostname to {{ inventory_hostname }}"
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Group add gpadmin
+  group:
+    name: gpadmin
+    state: present
+
+- name: User add gpadmin
+  user:
+    name: gpadmin
+    group: gpadmin
+    comment: "Greenplum Admin"
+    password: "{{ gpadmin_pass | password_hash('sha512') }}"
+    createhome: yes
+    shell: /bin/bash
+    state: present
+
+- name: Disable firewalld
+  service:
+    name: firewalld
+    state: stopped
+    enabled: no
+
+- name: Modify /etc/sysctl.conf
+  lineinfile:
+    dest: /etc/sysctl.conf
+    regexp: "{{ item.regexp  }}"
+    line: "{{ item.line  }}"
+    state: "{{ item.state  }}"
+  with_items:
+    - { regexp: '^kernel.shmmax', line: 'kernel.shmmax = 500000000', state: present  }
+    - { regexp: '^kernel.shmmni', line: 'kernel.shmmni = 4096', state: present  }
+    - { regexp: '^kernel.shmall', line: 'kernel.shmall = 4000000000', state: present  }
+    - { regexp: '^kernel.sem', line: 'kernel.sem = 250 512000 100 2048', state: present  }
+    - { regexp: '^kernel.sysrq', line: 'kernel.sysrq = 1', state: present  }
+    - { regexp: '^kernel.core_uses_pid', line: 'kernel.core_uses_pid = 1', state: present  }
+    - { regexp: '^kernel.msgmnb', line: 'kernel.msgmnb = 65536', state: present  }
+    - { regexp: '^kernel.msgmax', line: 'kernel.msgmax = 65536', state: present  }
+    - { regexp: '^kernel.msgmni', line: 'kernel.msgmni = 2048', state: present  }
+    - { regexp: '^net.ipv4.tcp_syncookies', line: 'net.ipv4.tcp_syncookies = 1', state: present  }
+    - { regexp: '^net.ipv4.ip_forward', line: 'net.ipv4.ip_forward = 0', state: present  }
+    - { regexp: '^net.ipv4.conf.default.accept_source_route', line: 'net.ipv4.conf.default.accept_source_route = 0', state: present  }
+    - { regexp: '^net.ipv4.tcp_tw_recycle', line: 'net.ipv4.tcp_tw_recycle = 1', state: present  }
+    - { regexp: '^net.ipv4.tcp_max_syn_backlog', line: 'net.ipv4.tcp_max_syn_backlog = 4096', state: present  }
+    - { regexp: '^net.ipv4.conf.all.arp_filter', line: 'net.ipv4.conf.all.arp_filter = 1', state: present  }
+    - { regexp: '^net.ipv4.ip_local_port_range', line: 'net.ipv4.ip_local_port_range = 1025 65535', state: present  }
+    - { regexp: '^net.core.netdev_max_backlog', line: 'net.core.netdev_max_backlog = 10000', state: present  }
+    - { regexp: '^net.core.rmem_max', line: 'net.core.rmem_max = 2097152', state: present  }
+    - { regexp: '^net.core.wmem_max', line: 'net.core.wmem_max = 2097152', state: present  }
+    - { regexp: '^vm.overcommit_memory', line: 'vm.overcommit_memory = 2', state: present  }
+  notify:
+    - reload sysctl
+
+- name: Set security limits
+  copy:
+    src: security_limits.conf
+    dest: /etc/security/limits.d/95-gpdb.conf
+  notify:
+    - restart system
+    - waiting for server to come back after reboot
+
+- name: Format greenplum device {{ greenplum_disks }}
+  filesystem:
+    fstype: xfs
+    dev: "/dev/{{ item.dev }}"
+  with_items:
+    - "{{ greenplum_disks }}"
+
+- name: Create data directories
+  file:
+    path: "{{ item.target }}"
+    owner: gpadmin
+    group: gpadmin
+    mode: 0755
+    state: directory
+  with_items:
+    - "{{ greenplum_disks }}"
+
+- name: Mount device
+  mount:
+    path: "{{ item.target }}"
+    src: "/dev/{{ item.dev }}"
+    fstype: xfs
+    opts: rw,nodev,noatime,nobarrier,inode64
+    state: mounted
+  with_items:
+    - "{{ greenplum_disks }}"
+
+- name: Chown data directories
+  file: 
+    path: "{{ item.target }}"
+    state: directory
+    owner: gpadmin
+    group: gpadmin
+    mode: 0755
+    recurse: yes
+  with_items:
+    - "{{ greenplum_disks }}"
+
+# FIXME
+- name: Create greenplum master data directory
+  file:
+    path: "/data1/{{ item  }}"
+    owner: gpadmin
+    group: gpadmin
+    state: directory
+  with_items:
+    - gpmaster
+  when: inventory_hostname in greenplum_master or inventory_hostname in greenplum_standby
+
+- name: Create greenplum data node directory
+  file:
+    path: "/data1/{{ item  }}"
+    owner: gpadmin
+    group: gpadmin
+    state: directory
+  with_items:
+    - gpdatap1
+    - gpdatap2
+    - gpdatam1
+    - gpdatam2
+  when: inventory_hostname in greenplum_segments
+
+- name: Set blockdev(read-ahead) 16384
+  command: "/sbin/blockdev --setra 16384 /dev/{{ item.dev }}"
+  with_items:
+    - "{{ greenplum_disks }}"
+
+- name: Ensure rc.local executable
+  file:
+    path: /etc/rc.d/rc.local
+    mode: "a+x"
+
+- name: Set blockdev at boot time
+  lineinfile:
+    path: /etc/rc.local
+    line: "/sbin/blockdev --setra 16384 /dev/{{ item.dev }}"
+  with_items:
+    - "{{ greenplum_disks }}"
+
+- name: Set linux disk I/O scheduler as deadline
+  command: "echo deadline > /sys/block/{{ item.dev }}/queue/scheduler"
+  with_items:
+    - "{{ greenplum_disks }}"
+
+- name: Specify I/O scheduler at boot time
+  command: grubby --update-kernel=ALL --args=elevator=deadline
+
+- name: Disable Transparent Huge Pages
+  command: echo never > /sys/kernel/mm/transparent_hugepage
+
+- name: Disable Transparent Huge Pages at boot time
+  command: grubby --update-kernel=ALL --args=transparent_hugepage=never
+
+- name: Increase sshd MaxStartups limit
+  lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp  }}"
+    line: "{{ item.line  }}"
+    state: "{{ item.state  }}"
+  with_items:
+    - { regexp: '^#MaxStartups 10:30:100', line: 'MaxStartups 200', state: present  }
+  notify:
+    - reload sshd
+
+- meta: flush_handlers
+
+- name: Scp greenplum rpm file
+  copy:
+    src: "{{ greenplum_bin }}.rpm"
+    dest: "/home/gpadmin/{{ greenplum_bin }}.rpm"
+    owner: gpadmin
+    group: gpadmin
+    mode: 0755
+  when: inventory_hostname in greenplum_master
+
+- name: Scp greeplum all_nodes
+  template:
+    src: all_nodes.j2
+    dest: /home/gpadmin/all_nodes
+    owner: gpadmin
+    group: gpadmin
+  when: inventory_hostname in greenplum_master
+
+- name: Scp greenplum seg_nodes
+  template:
+    src: seg_nodes.j2
+    dest: /home/gpadmin/seg_nodes
+    owner: gpadmin
+    group: gpadmin
+  when: inventory_hostname in greenplum_master
+
+- name: Scp greenplum gpinitsystem_config
+  template:
+    src: gpinitsystem_config.j2
+    dest: /home/gpadmin/gpinitsystem_config
+    owner: gpadmin
+    group: gpadmin
+  when: inventory_hostname in greenplum_master
+
+- name: Yum localinstall greenplum
+  yum: 
+    name: "/home/gpadmin/{{ greenplum_bin }}.rpm"
+    state: installed
+  when: inventory_hostname in greenplum_master
+
+- name: Chown greenplum-db directory
+  file: 
+    path: /usr/local/greenplum-db-5.8.0
+    state: directory
+    owner: gpadmin
+    group: gpadmin
+    mode: 0755
+    recurse: yes
+  when: inventory_hostname in greenplum_master
+
+- name: Link greenplum-db directory
+  file:
+    src: /usr/local/greenplum-db-5.8.0
+    dest: /usr/local/greenplum-db
+    state: link
+    owner: gpadmin
+    group: gpadmin
+  when: inventory_hostname in greenplum_master
+
+- name: Add MASTER_DATA_DIRECTORY to greenplum_path.sh
+  lineinfile:
+    dest: /usr/local/greenplum-db/greenplum_path.sh
+    regexp: "{{ item.regexp  }}"
+    line: "{{ item.line  }}"
+    state: "{{ item.state  }}"
+  with_items:
+    - { regexp: '^export MASTER_DATA_DIRECTORY=', line: 'export MASTER_DATA_DIRECTORY=/data1/gpmaster/gpseg-1', state: present  }
+  when: inventory_hostname in greenplum_master
+
+- name: Add greenplum_path.sh to bashrc
+  lineinfile:
+    dest: /root/.bashrc
+    line: "source /usr/local/greenplum-db/greenplum_path.sh"
+    state: present
+  when: inventory_hostname in greenplum_master
+
+- name: Add greenplum_path.sh to bashrc
+  lineinfile:
+    dest: /home/gpadmin/.bashrc
+    line: "source /usr/local/greenplum-db/greenplum_path.sh"
+    state: present
+  when: inventory_hostname in greenplum_master
+
+- debug:
+    msg: >
+        "ansible pre-install completed. connect to master node: {{greenplum_master}} init system."

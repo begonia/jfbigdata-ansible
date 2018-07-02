@@ -1,0 +1,9 @@
+greenplum_disks:
+  - { dev: "vdb", target: "/data1" }
+greenplum_bin: greenplum-db-5.8.0-rhel7-x86_64
+
+gpadmin_pass: "123456"
+
+greenplum_master: "{{ groups.greenplum_master }}"
+greenplum_standby: "{{ groups.greenplum_standby}}"
+greenplum_segments: "{{ groups.greenplum_segments }}"

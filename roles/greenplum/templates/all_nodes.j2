@@ -1,0 +1,9 @@
+{% for master in greenplum_master %}
+{{ master }}
+{% endfor %}
+{% for standby in greenplum_standby %}
+{{ standby }}
+{% endfor %}
+{% for segment in greenplum_segments %}
+{{ segment }}
+{% endfor %}
