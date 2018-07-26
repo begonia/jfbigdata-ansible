@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+set -ev
+
+STOP_MYSQL=false
+
+if ! systemctl status mysql; then
+  STOP_MYSQL=true
+  systemctl set-environment MYSQLD_OPTS="--bind-address=127.0.0.1"
+  systemctl start mysql
+  sleep 10
+  systemctl status mysql
+fi
+
+if mysqladmin --no-defaults --port=3306 --socket=/var/run/mysqld/mysqld.sock --host=127.0.0.1 --user=root password "{{ galera_root_password }}"; then
+  mysql -u root -h localhost -p{{ galera_root_password }} -e "UPDATE mysql.user SET Password=PASSWORD('$rootpass') WHERE User='root';"
+  mysql -u root -h localhost -p{{ galera_root_password }} -e "DELETE FROM mysql.user WHERE user='';"
+  mysql -u root -h localhost -p{{ galera_root_password }} -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('%', 'localhost', '127.0.0.1', '::1');"
+  mysql -u root -h localhost -p{{ galera_root_password }} -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';"
+  mysql -u root -h localhost -p{{ galera_root_password }} -e "GRANT ALL PRIVILEGES ON *.* TO '{{ galera_root_user }}'@'localhost' IDENTIFIED BY '{{ galera_root_password }}' WITH GRANT OPTION;"
+  mysql -u root -h localhost -p{{ galera_root_password }} -e "GRANT ALL PRIVILEGES ON *.* TO '{{ galera_root_user }}'@'127.0.0.1' IDENTIFIED BY '{{ galera_root_password }}' WITH GRANT OPTION;"
+  mysql -u root -h localhost -p{{ galera_root_password }} -e "GRANT ALL PRIVILEGES ON *.* TO '{{ galera_root_user }}'@'::1' IDENTIFIED BY '{{ galera_root_password }}' WITH GRANT OPTION;"
+  mysql -u root -h localhost -p{{ galera_root_password }} -e "GRANT ALL PRIVILEGES ON *.* TO '{{ galera_root_user }}'@'%' IDENTIFIED BY '{{ galera_root_password }}' WITH GRANT OPTION;"
+  mysql -u root -h localhost -p{{ galera_root_password }} -e "FLUSH PRIVILEGES;"
+fi
+
+if [ "${STOP_MYSQL}" = true  ]; then
+  systemctl stop mysql
+fi
+
+# Create a marker file to ensure this script is not run again
+systemctl unset-environment MYSQLD_OPTS
+touch "/var/lib/mysql/osa_default_secured"

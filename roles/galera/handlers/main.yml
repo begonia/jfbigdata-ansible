@@ -1,0 +1,8 @@
+- name: Reload the systemd daemon
+  systemd:
+    daemon_reload: yes
+    name: mysql
+    enabled: "yes"
+
+    #- name: Restart all mysql
+
